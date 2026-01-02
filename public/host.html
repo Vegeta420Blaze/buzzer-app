@@ -14,9 +14,9 @@
     <h1>RiBo Buzzer — Host</h1>
     <div class="room-info">
       <button id="btnCreateRoom" class="btn primary">Create Room</button>
-      <div id="roomCode" class="room-code">Room: —</div>
+      <span id="roomCode" class="room-code">Room: —</span>
       <button id="btnStartRound" class="btn success" disabled>Start Round</button>
-      <button id="btnEndRound" class="btn warn" disabled>End Round</button>
+      <button id="btnEndRound" class="btn" disabled>End Round</button>
     </div>
   </header>
 
@@ -24,12 +24,13 @@
     <section class="card">
       <h2>Scoring Config</h2>
       <div class="controls-grid">
-        <label>Points per part:
-          <input type="number" id="pointsPerPart" min="1" value="5" />
-        </label>
+        <label for="pointsPerPart">Points per part:</label>
+        <input id="pointsPerPart" type="number" min="1" step="1" value="5" />
         <button id="btnConfigSave" class="btn">Apply</button>
       </div>
-      <p class="muted small">Each answer has two parts. Award 5 for a correct part or 10 for a full answer.</p>
+      <p class="muted small">
+        Each answer has two parts. Award 5 for a correct part or 10 for a full answer.
+      </p>
 
       <h2>Buzz Queue</h2>
       <ol id="queueList" class="queue-list"></ol>
@@ -39,7 +40,9 @@
         <button id="btnNext" class="btn">Next (No Score)</button>
         <button id="btnDQNextRound" class="btn warn">DQ Next Round</button>
       </div>
-      <p class="muted small">“Award 5 (Part)” keeps the player at the front of the queue. “Award 10 (Full)” removes them.</p>
+      <p class="muted small">
+        “Award 5 (Part)” keeps the player at the front of the queue. “Award 10 (Full)” removes them.
+      </p>
     </section>
 
     <section class="card">
@@ -60,8 +63,9 @@
     </section>
   </main>
 
+  <div id="toast" class="toast hidden"></div>
   <footer class="app-footer">
-    <div id="toast" class="toast hidden"></div>
+    <span class="muted small">RiBo Buzzer — Render deployment</span>
   </footer>
 
   <script src="host.js"></script>

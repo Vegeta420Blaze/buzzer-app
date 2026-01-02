@@ -1,6 +1,4 @@
 
-/* Shared look & feel */
-
 :root {
   --bg: #0f1320;
   --card: #1b2236;
@@ -11,17 +9,16 @@
   --warn: #ff9f43;
   --danger: #ff5c5c;
 }
-
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body.page { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: var(--bg); color: var(--text); }
 
 .app-header, .app-footer { padding: 12px 16px; background: #0b0e17; border-bottom: 1px solid #12172a; }
 .app-footer { border-top: 1px solid #12172a; border-bottom: none; }
-
 h1, h2, h3 { margin: 8px 0 12px; }
 .muted { color: var(--muted); }
 .small { font-size: 0.85rem; }
+.hidden { display: none !important; }
 
 .btn {
   display: inline-block; padding: 8px 12px; border-radius: 10px; border: 1px solid #2c3757;
@@ -39,9 +36,10 @@ h1, h2, h3 { margin: 8px 0 12px; }
 .content.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px; }
 .content { padding: 16px; }
 .card { background: var(--card); padding: 12px; border-radius: 12px; border: 1px solid #2a3556; }
-
 .controls-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; }
-.queue-list, .leaderboard-list { margin: 0; padding: 0 0 0 20px; }
+
+.queue-list, .leaderboard-list { margin: 0; padding-left: 20px; }
+.queue-list li, .leaderboard-list li { margin: 6px 0; }
 
 /* Toast */
 .toast {
@@ -58,19 +56,30 @@ h1, h2, h3 { margin: 8px 0 12px; }
 .qr-link-row { display: flex; gap: 8px; }
 .link-input { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #2a3556; background: #0f1933; color: var(--text); }
 
-/* Player page: BUZZ button → larger & color states */
+/* Player BUZZ button — smaller, centered, capped */
 .buzz-btn {
-  font-size: 2.2rem;
-  padding: 18px 24px;
-  border-radius: 16px;
-  min-height: 74px;
-  min-width: 220px;
+  font-size: 1.0rem;
+  padding: 10px 14px;
+  border-radius: 12px;
+  min-height: 40px;
+  min-width: 140px;
+  max-width: 220px;
   touch-action: manipulation;
   user-select: none;
   font-weight: 800;
+  display: block;
+  margin: 0 auto;
 }
-.player .buzz-btn { width: 100%; }
+@media (max-width: 380px) {
+  .buzz-btn {
+    font-size: 0.95rem;
+    padding: 9px 12px;
+    min-height: 38px;
+    max-width: 200px;
+  }
+}
 
+/* Buzz color states */
 .buzz-green {
   background: var(--success) !important;
   color: #05190e !important;
@@ -84,37 +93,25 @@ h1, h2, h3 { margin: 8px 0 12px; }
   box-shadow: 0 0 0 3px rgba(255,92,92,0.25);
 }
 
-/* Queue item highlighting (host + player views) */
+/* Queue highlights */
 .queue-item {
   padding: 6px 8px;
   border-radius: 10px;
   margin: 6px 0;
-  list-style: decimal inside;
 }
-.queue-head {
-  border-left: 6px solid var(--success);
-  background: rgba(60,196,128,0.10);
-}
-.queue-rest {
-  border-left: 6px solid var(--danger);
-  background: rgba(255,92,92,0.08);
-}
+.queue-head { border-left: 6px solid var(--success); background: rgba(60,196,128,0.10); }
+.queue-rest { border-left: 6px solid var(--danger); background: rgba(255,92,92,0.08); }
+.you-label { font-weight: 700; color: #a6ffcf; margin-left: 6px; }
 
-.you-label {
-  font-weight: 700;
-  color: #a6ffcf;
-  margin-left: 6px;
-}
-
-/* Player-specific badge */
+/* Player badges */
 .badge {
   display: inline-block; padding: 6px 10px; border-radius: 999px; font-weight: 700; font-size: 0.95rem;
   background: var(--danger); color: #350a0a; border: 1px solid #c53a3a;
 }
 .badge.muted { background: #2c3a64; color: #bcd; border-color: #42517a; }
-.hidden { display: none !important; }
 
-/* Responsive columns → stack on small screens */
+/* Responsive columns */
 @media (max-width: 900px) {
   .content.two-col { grid-template-columns: 1fr; }
 }
+``

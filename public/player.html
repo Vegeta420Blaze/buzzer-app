@@ -3,14 +3,13 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>RiBo Buzzer — Player</title>
+  <title id="pageTitleTag">RiBo Buzzer — Player</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="styles.css" />
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body class="page player">
   <header class="app-header">
-    <!-- Will be changed to “RiBo Buzzer — {name}” after join -->
     <h1 id="pageTitle">RiBo Buzzer — Player</h1>
   </header>
 
@@ -18,15 +17,17 @@
     <section class="card">
       <h2>Join</h2>
       <div class="controls-grid">
-        <input type="text" id="roomCode" placeholder="Room Code" maxlength="6" />
-        <input type="text" id="playerName" placeholder="Your Name" maxlength="24" />
+        <label for="roomCode">Room code:</label>
+        <input id="roomCode" type="text" placeholder="ABC123" />
+        <label for="playerName">Name:</label>
+        <input id="playerName" type="text" placeholder="Your name" />
         <button id="btnJoin" class="btn primary">Join</button>
       </div>
     </section>
 
     <section class="card">
       <h2>Buzz</h2>
-      <div style="display:flex; gap:12px; align-items:center;">
+      <div style="display:flex; gap:12px; align-items:center; justify-content:center;">
         <button id="btnBuzz" class="btn buzz-btn" disabled>BUZZ!</button>
         <span id="dqBadge" class="badge hidden">DQ this round</span>
       </div>
@@ -36,12 +37,18 @@
     <section class="card">
       <h2>Live Queue</h2>
       <ol id="queueListPlayer" class="queue-list"></ol>
-      <p class="muted small">Legend: <strong>Green</strong> = first in queue; <strong>Red</strong> = queued (not first).</p>
+      <p class="muted small">Legend: Green = first in queue; Red = queued (not first).</p>
+    </section>
+
+    <section class="card">
+      <h2>Leaderboard</h2>
+      <ol id="leaderboardListPlayer" class="leaderboard-list"></ol>
     </section>
   </main>
 
+  <div id="toast" class="toast hidden"></div>
   <footer class="app-footer">
-    <div id="toast" class="toast hidden"></div>
+    <span class="muted small">RiBo Buzzer — have fun!</span>
   </footer>
 
   <script src="player.js"></script>
