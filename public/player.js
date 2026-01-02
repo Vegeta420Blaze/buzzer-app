@@ -3,6 +3,7 @@
 (() => {
   const socket = io();
 
+  const pageTitle = document.getElementById('pageTitle');
   const roomCodeEl = document.getElementById('roomCode');
   const playerNameEl = document.getElementById('playerName');
   const btnJoin = document.getElementById('btnJoin');
@@ -22,14 +23,11 @@
   let roundActive = false;
   let dqThisRound = false;
   let myId = null;
+  let myName = 'Player';
   let latestQueue = []; // [{id,name}, ...]
 
-  socket.on('connect', () => {
-    myId = socket.id;
-  });
-  socket.on('reconnect', () => {
-    myId = socket.id;
-  });
+  socket.on('connect', () => { myId = socket.id; });
+  socket.on('reconnect', () => { myId = socket.id; });
 
   function showToast(kind, message) {
     toastEl.className = `toast ${kind}`;
@@ -55,15 +53,12 @@
   }
 
   function updateBuzzState() {
-    // Determine my position from the latest queue
     const ids = latestQueue.map(q => q.id);
     const inQueue = ids.includes(myId);
     const isHead = ids[0] === myId;
 
-    // Reset classes
     btnBuzz.classList.remove('buzz-green', 'buzz-red');
 
-    // Decide enable/disable + color
     if (!joinedRoom || !roundActive || dqThisRound) {
       btnBuzz.disabled = true;
       buzzHint.textContent = dqThisRound
@@ -83,7 +78,6 @@
       buzzHint.textContent = 'Ready to buzz!';
     }
 
-    // DQ badge visibility
     dqBadge.classList.toggle('hidden', !dqThisRound);
   }
 
@@ -95,6 +89,11 @@
       return;
     }
     joinedRoom = code;
+    myName = name;
+
+    // ⬇️ Update header title exactly as requested:
+    pageTitle.textContent = `RiBo Buzzer — ${myName}`;
+
     socket.emit('player:joinRoom', { roomCode: code, playerName: name });
     showToast('info', 'Joined. Wait for the round to start.');
     updateBuzzState();
