@@ -1,0 +1,105 @@
+
+<!-- public/host.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Buzzer Host</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="header">
+    <h1>Buzzer — Host</h1>
+    <div class="room-controls">
+      <button id="btnCreateRoom" class="btn-large">Create Room</button>
+      <input id="inpRoomCode" type="text" placeholder="Room Code (6 chars)" maxlength="6" />
+      <button id="btnJoinRoom" class="btn-large">Join Room</button>
+    </div>
+    <div id="roomInfo" class="room-info">
+      <span id="lblRoomCode">Room: —</span>
+      <span id="lblRound">Round: 0</span>
+      <span id="lblPlayers">Players: 0</span>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Scoring Config -->
+    <section class="panel">
+      <h2>Scoring Config</h2>
+      <div class="form-grid">
+        <label>
+          Points per part
+          <input id="inpPointsPerPart" type="number" step="1" min="0" max="100" value="5" />
+        </label>
+      </div>
+      <div class="panel-actions">
+        <button id="btnApplyConfig" class="btn-primary btn-large">Apply</button>
+      </div>
+      <div id="configStatus" class="status muted"></div>
+      <p class="muted">Each answer has two parts. Award 5 for a correct part or 10 for a full answer.</p>
+    </section>
+
+    <!-- Round Controls -->
+    <section class="panel">
+      <h2>Round</h2>
+      <div class="panel-actions">
+        <button id="btnStartRound" class="btn-success btn-large">Start Round</button>
+        <button id="btnEndRound" class="btn-danger btn-large">End Round</button>
+      </div>
+    </section>
+
+    <!-- Queue -->
+    <section class="panel">
+      <h2>Buzz Queue</h2>
+      <ul id="queueList" class="list"></ul>
+      <div class="panel-actions">
+        <button id="btnAwardPart" class="btn-success btn-large">Award 5 (Part)</button>
+        <button id="btnAwardFull" class="btn-success btn-large">Award 10 (Full)</button>
+        <button id="btnNext" class="btn-warning btn-large">Next (No Score)</button>
+        <button id="btnDQNextRound" class="btn-danger btn-large">DQ Next Round</button>
+      </div>
+      <p class="muted">“Award 5 (Part)” keeps the player at the front of the queue. “Award 10 (Full)” removes them.</p>
+    </section>
+
+    <!-- Leaderboard -->
+    <section class="panel">
+      <h2>Leaderboard</h2>
+      <table class="table">
+        <thead>
+          <tr><th>#</th><th>Name</th><th>Score</th></tr>
+        </thead>
+        <tbody id="leaderboardBody"></tbody>
+      </table>
+    </section>
+
+    <!-- QR Code -->
+    <section class="panel">
+      <h2>Player Join QR</h2>
+      <div class="panel-actions">
+        <button id="btnShowQr" class="btn-primary btn-large">Show QR</button>
+        <button id="btnHideQr" class="btn-large">Hide QR</button>
+      </div>
+      <div id="qrSection" style="margin-top:12px; display:none;">
+        <div style="display:grid; grid-template-columns: 240px 1fr; gap:12px; align-items:start;">
+          <div style="background:#0b1220; border:1px solid #334155; border-radius:10px; padding:8px; display:flex; align-items:center; justify-content:center;">
+            <canvas id="qrCanvas" width="220" height="220"></canvas>
+          </div>
+          <div>
+            <div id="qrUrl" class="muted"></div>
+            <p class="muted" style="margin-top:8px;">Open this link on phones on the same Wi‑Fi to join the player page.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Toasts -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/qrcode.min.js"></script>
+  <script src="/host.js"></script>
+</body>
+</html>

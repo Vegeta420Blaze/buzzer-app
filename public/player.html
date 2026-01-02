@@ -1,0 +1,84 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Player</title>
+
+  <!-- Correct stylesheet tag -->
+  <link rel="stylesheet" href="/styles.css" />
+
+  <!-- Small inline fallback if styles.css doesn't load -->
+  <style>
+    .container { max-width: 820px; margin: 0 auto; padding: 16px; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .input { padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+    .btn { padding: 10px 14px; border: none; border-radius: 6px; cursor: pointer; background: #2d6cdf; color: #fff; }
+    .btn.secondary { background: #888; }
+    .mono { font-family: Consolas, 'Courier New', monospace; }
+    .panel { border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-top: 12px; }
+    .muted { color: #777; }
+    .small { font-size: 0.85em; }
+    .hint { color: #666; font-size: 0.9em; }
+    .disabled { opacity: 0.6; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1 id="title">Player</h1>
+      <p class="muted">Enter the room code and your name, then Join.</p>
+    </header>
+
+    <!-- Join controls -->
+    <section class="panel" id="join-panel">
+      <div class="row">
+        <label class="mono" for="room-code">ROOM CODE</label>
+        <input id="room-code" class="input mono" maxlength="6" placeholder="ABC123" />
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <label for="player-name">Name</label>
+        <input id="player-name" class="input" maxlength="32" placeholder="Your name" />
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <button id="btn-join" class="btn">Join</button>
+        <span id="join-status" class="muted small" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <!-- Buzz controls -->
+    <section class="panel">
+      <h2>Buzz</h2>
+      <button id="btn-buzz" class="btn" disabled>BUZZ</button>
+      <span id="buzz-msg" class="muted small" style="margin-left:8px;" aria-live="polite"></span>
+      <p class="hint">BUZZ is enabled only when the round is active. Rapid taps trigger a brief cooldown.</p>
+    </section>
+
+    <!-- Buzz Status (per-player) -->
+    <section id="buzz-status" class="panel">
+      <h2>Status</h2>
+      <div class="buzz-status-row">
+        <span id="buzz-icon" class="buzz-icon idle" aria-label="Buzz status icon"></span>
+        <span id="buzz-text" class="buzz-text">Not buzzed</span>
+      </div>
+      <p class="hint">Green = you are first. Red = you are queued (not first). Grey = you haven’t buzzed.</p>
+    </section>
+
+    <!-- Public Queue (read-only on player page) -->
+    <section id="public-queue" class="panel">
+      <h2>Buzz Queue</h2>
+      <ol id="player-queue" class="queue-list" aria-live="polite"></ol>
+      <p class="muted small">Queue reflects server order (no duplicates). Updated in real time.</p>
+    </section>
+
+    <footer class="muted small" style="margin-top:16px;">
+      <p>Tip: If you can open this page but cannot Join, verify the room code and that the host is reachable.</p>
+    </footer>
+  </main>
+
+  <!-- Correct script tags -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/player.js"></script>
+</body>
+</html>
