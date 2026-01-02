@@ -1,74 +1,48 @@
 
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Buzzer — Player</title>
+  <title>RiBo Buzzer — Player</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <!-- Shared theme -->
-  <link rel="stylesheet" href="/styles.css" />
-
-  <style>
-    /* Page-specific minimal tweaks (keeps your shared theme) */
-    .page { max-width: 900px; margin: 24px auto; padding: 16px; }
-    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-    .card { padding: 16px; border-radius: 10px; background: rgba(255,255,255,0.06); }
-    .btn { padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; }
-    .btn-primary { background: #4B7CFB; color: #fff; }
-    .btn-secondary { background: #1f2a44; color: #dbe5ff; }
-    .btn:disabled { opacity: .5; cursor: not-allowed; }
-    input[type="text"] { padding: 8px; border-radius: 8px; min-width: 220px; }
-    .log { font-family: ui-monospace, Menlo, Consolas, "Liberation Mono", monospace; white-space: pre-wrap; }
-    .ok { color: #4bd36b; }
-    .warn { color: #f0ad4e; }
-    .err { color: #ff6b6b; }
-    .leaderboard table { width: 100%; border-collapse: collapse; }
-    .leaderboard th, .leaderboard td { padding: 8px; text-align: left; }
-    .queue { font-weight: 600; }
-  </style>
-</head>
-<body>
-  <div class="page">
-    <h1>Buzzer — Player</h1>
-
-    <div class="card">
-      <div class="row">
-        <input id="roomCode" type="text" placeholder="Room code (e.g., UZJMJJ)" />
-        <input id="playerName" type="text" placeholder="Your name" />
-        <button id="btnJoin" class="btn btn-primary">Join</button>
-      </div>
-      <div id="joinStatus" class="log"></div>
-    </div>
-
-    <div class="card">
-      <div class="row">
-        <button id="btnBuzz" class="btn btn-secondary" disabled>BUZZ</button>
-      </div>
-      <div id="buzzHint" class="log"></div>
-    </div>
-
-    <div class="card leaderboard">
-      <h3>Leaderboard</h3>
-      <table id="lbTable">
-        <thead><tr><th>#</th><th>Name</th><th>Score</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-
-    <div class="card">
-      <h3>Buzz Queue</h3>
-      <div id="queueView" class="queue"></div>
-    </div>
-
-    <div class="card">
-      <h3>Messages</h3>
-      <div id="messages" class="log"></div>
-    </div>
-  </div>
-
-  <!-- Socket.IO client from same origin and page script -->
+  <link rel="stylesheet" href="styles.css" />
   <script src="/socket.io/socket.io.js"></script>
-  <script src="/player.js"></script>
+</head>
+<body class="page player">
+  <header class="app-header">
+    <h1>RiBo Buzzer — Player</h1>
+  </header>
+
+  <main class="content">
+    <section class="card">
+      <h2>Join</h2>
+      <div class="controls-grid">
+        <input type="text" id="roomCode" placeholder="Room Code" maxlength="6" />
+        <input type="text" id="playerName" placeholder="Your Name" maxlength="24" />
+        <button id="btnJoin" class="btn primary">Join</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Buzz</h2>
+      <div style="display:flex; gap:12px; align-items:center;">
+        <button id="btnBuzz" class="btn buzz-btn" disabled>BUZZ!</button>
+        <span id="dqBadge" class="badge hidden">DQ this round</span>
+      </div>
+      <p class="muted" id="buzzHint">Buzz is enabled only during an active round.</p>
+    </section>
+
+    <section class="card">
+      <h2>Live Queue</h2>
+      <ol id="queueListPlayer" class="queue-list"></ol>
+      <p class="muted small">Legend: <strong>Green</strong> = first in queue; <strong>Red</strong> = queued (not first).</p>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <div id="toast" class="toast hidden"></div>
+  </footer>
+
+  <script src="player.js"></script>
 </body>
 </html>

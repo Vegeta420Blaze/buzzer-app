@@ -1,105 +1,142 @@
 
-// Player page script — same-origin Socket.IO
-const socket = io();
+/* Player page logic */
+(() => {
+  const socket = io();
 
-// Elements
-const elRoomCode   = document.getElementById('roomCode');
-const elPlayerName = document.getElementById('playerName');
-const elBtnJoin    = document.getElementById('btnJoin');
-const elBtnBuzz    = document.getElementById('btnBuzz');
-const elJoinStatus = document.getElementById('joinStatus');
-const elBuzzHint   = document.getElementById('buzzHint');
-const elMessages   = document.getElementById('messages');
-const elLbTable    = document.getElementById('lbTable').querySelector('tbody');
-const elQueueView  = document.getElementById('queueView');
+  const roomCodeEl = document.getElementById('roomCode');
+  const playerNameEl = document.getElementById('playerName');
+  const btnJoin = document.getElementById('btnJoin');
 
-// Client-side state
-let joinedRoomCode = null;
-let myName = null;
-let roundActive = false;
+  const btnBuzz = document.getElementById('btnBuzz');
+  const dqBadge = document.getElementById('dqBadge');
+  const buzzHint = document.getElementById('buzzHint');
+  const queueList = document.getElementById('queueListPlayer');
+  const toastEl = document.getElementById('toast');
 
-// UTIL: logs
-function logMsg(target, className, msg) {
-  const div = document.createElement('div');
-  div.className = className;
-  div.textContent = msg;
-  target.prepend(div);
-}
+  // Allow host-shared link: /player.html?room=ABC123
+  const params = new URLSearchParams(window.location.search);
+  const prefillRoom = params.get('room');
+  if (prefillRoom) roomCodeEl.value = prefillRoom;
 
-// Join room
-elBtnJoin.addEventListener('click', () => {
-  const code = (elRoomCode.value || '').trim().toUpperCase();
-  const name = (elPlayerName.value || '').trim();
-  if (!code || !name) {
-    logMsg(elJoinStatus, 'warn', 'Enter room code and your name.');
-    return;
+  let joinedRoom = null;
+  let roundActive = false;
+  let dqThisRound = false;
+  let myId = null;
+  let latestQueue = []; // [{id,name}, ...]
+
+  socket.on('connect', () => {
+    myId = socket.id;
+  });
+  socket.on('reconnect', () => {
+    myId = socket.id;
+  });
+
+  function showToast(kind, message) {
+    toastEl.className = `toast ${kind}`;
+    toastEl.textContent = message;
+    toastEl.classList.remove('hidden');
+    setTimeout(() => toastEl.classList.add('hidden'), 2500);
   }
-  socket.emit('player:joinRoom', { roomCode: code, playerName: name });
-  joinedRoomCode = code;
-  myName = name;
-  logMsg(elJoinStatus, 'ok', `Joining ${code} as ${myName}...`);
-});
 
-// Buzz
-elBtnBuzz.addEventListener('click', () => {
-  if (!joinedRoomCode) {
-    logMsg(elBuzzHint, 'warn', 'Join a room first.');
-    return;
-  }
-  if (!roundActive) {
-    logMsg(elBuzzHint, 'warn', 'Round is not active.');
-    return;
-  }
-  socket.emit('player:buzz', { roomCode: joinedRoomCode });
-});
-
-// State sync
-socket.on('state:sync', (state) => {
-  roundActive = !!state.roundActive;
-  elBtnBuzz.disabled = !roundActive;
-
-  // Queue
-  try {
-    const list = (state.queue || []).map((q, i) => `${i + 1}. ${q.name}`).join('  |  ');
-    elQueueView.textContent = list || '(empty)';
-  } catch (_) {}
-
-  // Leaderboard
-  try {
-    elLbTable.innerHTML = '';
-    (state.leaderboard || []).forEach((row, idx) => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${idx + 1}</td><td>${row.name}</td><td>${row.score ?? 0}</td>`;
-      elLbTable.appendChild(tr);
+  function renderQueue(queue) {
+    queueList.innerHTML = '';
+    (queue || []).forEach((item, idx) => {
+      const li = document.createElement('li');
+      li.className = `queue-item ${idx === 0 ? 'queue-head' : 'queue-rest'}`;
+      li.textContent = `${idx + 1}. ${item.name}`;
+      if (item.id === myId) {
+        const you = document.createElement('span');
+        you.className = 'you-label';
+        you.textContent = ' (You)';
+        li.appendChild(you);
+      }
+      queueList.appendChild(li);
     });
-  } catch (_) {}
+  }
 
-  if (myName) document.title = `Buzzer — ${myName}`;
-});
+  function updateBuzzState() {
+    // Determine my position from the latest queue
+    const ids = latestQueue.map(q => q.id);
+    const inQueue = ids.includes(myId);
+    const isHead = ids[0] === myId;
 
-// Round events
-socket.on('round:start', (info) => {
-  roundActive = true;
-  elBtnBuzz.disabled = false;
-  logMsg(elBuzzHint, 'ok', `Round ${info.roundNumber} started.`);
-});
+    // Reset classes
+    btnBuzz.classList.remove('buzz-green', 'buzz-red');
 
-socket.on('round:end', (info) => {
-  roundActive = false;
-  elBtnBuzz.disabled = true;
-  logMsg(elBuzzHint, 'warn', `Round ${info.roundNumber} ended.`);
-});
+    // Decide enable/disable + color
+    if (!joinedRoom || !roundActive || dqThisRound) {
+      btnBuzz.disabled = true;
+      buzzHint.textContent = dqThisRound
+        ? 'You are DQ this round.'
+        : 'Buzz is enabled only during an active round.';
+    } else if (isHead) {
+      btnBuzz.disabled = true;           // already buzzed; at head
+      btnBuzz.classList.add('buzz-green');
+      buzzHint.textContent = 'You are FIRST in the queue.';
+    } else if (inQueue) {
+      btnBuzz.disabled = true;           // already queued
+      btnBuzz.classList.add('buzz-red');
+      const pos = ids.indexOf(myId) + 1;
+      buzzHint.textContent = `Queued at position ${pos}.`;
+    } else {
+      btnBuzz.disabled = false;          // can buzz now
+      buzzHint.textContent = 'Ready to buzz!';
+    }
 
-// Cooldown
-socket.on('player:cooldown', ({ msRemaining }) => {
-  logMsg(elBuzzHint, 'warn', `Cooldown… ${Math.ceil(msRemaining)} ms`);
-});
+    // DQ badge visibility
+    dqBadge.classList.toggle('hidden', !dqThisRound);
+  }
 
-// Toasts
-socket.on('toast:info',   ({ message }) => logMsg(elMessages, 'ok',   message));
-socket.on('toast:warning',({ message }) => logMsg(elMessages, 'warn', message));
-socket.on('toast:error',  ({ message }) => logMsg(elMessages, 'err',  message));
+  btnJoin.addEventListener('click', () => {
+    const code = roomCodeEl.value.trim().toUpperCase();
+    const name = playerNameEl.value.trim() || 'Player';
+    if (!code || code.length < 4) {
+      showToast('warning', 'Enter a valid room code.');
+      return;
+    }
+    joinedRoom = code;
+    socket.emit('player:joinRoom', { roomCode: code, playerName: name });
+    showToast('info', 'Joined. Wait for the round to start.');
+    updateBuzzState();
+  });
 
-// Connection status (debug)
-socket.on('connect',    () => logMsg(elMessages, 'ok',   `Connected (${socket.id})`));
-socket.on('disconnect', () => logMsg(elMessages, 'err',  'Disconnected'));
+  btnBuzz.addEventListener('click', () => {
+    if (!joinedRoom) return;
+    socket.emit('player:buzz', { roomCode: joinedRoom });
+  });
+
+  // Server broadcasts
+  socket.on('state:sync', (state) => {
+    roundActive = !!state.roundActive;
+    latestQueue = state.queue || [];
+    renderQueue(latestQueue);
+    updateBuzzState();
+  });
+
+  socket.on('round:start', () => {
+    roundActive = true;
+    updateBuzzState();
+    showToast('info', 'Round started!');
+  });
+
+  socket.on('round:end', () => {
+    roundActive = false;
+    latestQueue = [];
+    renderQueue(latestQueue);
+    updateBuzzState();
+    showToast('warning', 'Round ended.');
+  });
+
+  socket.on('player:status', ({ dqThisRound: dq }) => {
+    dqThisRound = !!dq;
+    updateBuzzState();
+  });
+
+  socket.on('player:cooldown', ({ msRemaining }) => {
+    showToast('warning', `Cooldown: ${Math.ceil(msRemaining)} ms`);
+  });
+
+  socket.on('toast:info', ({ message }) => showToast('info', message));
+  socket.on('toast:warning', ({ message }) => showToast('warning', message));
+  socket.on('toast:error', ({ message }) => showToast('error', message));
+})();
