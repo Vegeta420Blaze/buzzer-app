@@ -1,361 +1,309 @@
 
-// server.js
-const path = require('path');
-const os = require('os');
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
+"use strict";
 
+/**
+ * Buzzer App — server.js (Render-ready)
+ * ---------------------------------------------------------
+ * - Node + Express static server for /public
+ * - Socket.IO real-time for host & players
+ * - In-memory rooms, no persistence (fresh start on reboot)
+ * - Listens on process.env.PORT (required by Render)
+ *
+ * Event Contract (from handover):
+ * Host → Server:
+ *   host:createRoom
+ *   host:joinRoom { roomCode }
+ *   host:startRound { roomCode }
+ *   host:endRound { roomCode }
+ *   host:actionPartCorrect { roomCode }
+ *   host:actionFullCorrect { roomCode }
+ *   host:actionNext { roomCode }
+ *   host:actionDQNextRound { roomCode }
+ *   config:update { roomCode, pointsPerPart }
+ *
+ * Player → Server:
+ *   player:joinRoom { roomCode, playerName }
+ *   player:buzz { roomCode }
+ *
+ * Server → All in room (hosts & players unless specified):
+ *   host:roomCreated { roomCode } (to the host that created)
+ *   state:sync {
+ *      roomCode, roundActive, roundNumber,
+ *      queue: [{ id, name }],
+ *      leaderboard: [{ id, name, score }],
+ *      config: { pointsPerPart }
+ *   }
+ *   round:start { roomCode, roundNumber }
+ *   round:end { roomCode, roundNumber }
+ *   config:sync { roomCode, config: { pointsPerPart } }
+ *   player:cooldown { msRemaining } (to a specific player)
+ *   toast:info|toast:warning|toast:error { message }
+ */
+
+const path = require("path");
+const express = require("express");
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
 
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve static files from /public
+app.use(express.static(path.join(__dirname, "public")));
 
-// --- Rooms in memory ---
-/*
-room = {
-  code: 'ABC123',
-  roundActive: false,
-  roundNumber: 0,
-  queue: [],                 // array of socketIds in buzz order
-  players: {
-    socketId: { name, score, dqNextRound: false, dqThisRound: false }
-  },
-  hostSockets: new Set(),
-  lastBuzzAt: { socketId: timestampMs },
-  config: { pointsPerPart: 5 }
-}
-*/
-const rooms = Object.create(null);
+const http = require("http");
+const httpServer = http.createServer(app);
 
-// --- LAN IP detection ---
-function getLanIPv4() {
-  const ifaces = os.networkInterfaces();
-  for (const [name, addrs] of Object.entries(ifaces)) {
-    for (const a of addrs || []) {
-      // Prefer private IPv4 addresses
-      if (a.family === 'IPv4' && !a.internal) {
-        // Typical private ranges: 10.x.x.x, 172.16-31.x.x, 192.168.x.x
-        const ip = a.address;
-        if (
-          ip.startsWith('10.') ||
-          ip.startsWith('192.168.') ||
-          (ip.startsWith('172.') && (() => {
-            const secondOctet = Number(ip.split('.')[1]);
-            return secondOctet >= 16 && secondOctet <= 31;
-          })())
-        ) {
-          return ip;
-        }
-      }
-    }
-  }
-  // Fallback: first non-internal IPv4 or localhost
-  for (const addrs of Object.values(ifaces)) {
-    for (const a of addrs || []) {
-      if (a.family === 'IPv4' && !a.internal) return a.address;
-    }
-  }
-  return '127.0.0.1';
-}
-const LAN_IP = getLanIPv4();
+// Socket.IO (CORS relaxed; on Render same-origin is typical, but this is safe)
+const { Server } = require("socket.io");
+const io = new Server(httpServer, {
+  cors: { origin: "*", methods: ["GET", "POST"] }
+});
 
-// --- Helpers ---
+// ----------------------------------------------------------------------------
+// In‑memory store (per room)
+// ----------------------------------------------------------------------------
+/**
+ * rooms: Map<roomCode, {
+ *   code: string
+ *   roundActive: boolean
+ *   roundNumber: number
+ *   queue: string[]                 // socketIds, order = buzz order
+ *   players: { [socketId]: {
+ *       name: string,
+ *       score: number,
+ *       dqNextRound: boolean,
+ *       dqThisRound: boolean
+ *   }}
+ *   hostSockets: Set<string>
+ *   lastBuzzAt: { [socketId]: number }  // ms timestamps (server cooldown)
+ *   config: { pointsPerPart: number }   // default 5
+ * }>
+ */
+const rooms = new Map();
+
+// constants
+const CODE_LEN = 6;
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // A–Z, 2–9 (skip 0/1/I/O)
+const SERVER_COOLDOWN_MS = 300;
+const MAX_POINTS = 100;
+const DEFAULT_POINTS_PER_PART = 5;
+
+// ----------------------------------------------------------------------------
+// Helpers
+// ----------------------------------------------------------------------------
 function generateRoomCode() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  let code = "";
+  for (let i = 0; i < CODE_LEN; i++) {
+    code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+  }
   return code;
 }
-function getRoom(code) {
-  if (!code) return null;
-  const c = String(code).toUpperCase();
-  return rooms[c] || null;
-}
-function ensureRoomConfig(room) {
-  if (!room.config) room.config = { pointsPerPart: 5 };
-  if (typeof room.config.pointsPerPart !== 'number') room.config.pointsPerPart = 5;
-}
-function validatePointsPerPart(val) {
-  const n = Number(val);
-  if (!Number.isFinite(n) || n < 0 || n > 100) return null;
-  return Math.trunc(n);
-}
-function broadcastState(roomCode) {
-  const room = getRoom(roomCode);
-  if (!room) return;
-  const state = {
-    roomCode: room.code,
-    roundActive: room.roundActive,
-    roundNumber: room.roundNumber,
-    queue: room.queue.map(id => {
-      const p = room.players[id];
-      return p ? { id, name: p.name } : { id, name: 'Unknown' };
-    }),
-    leaderboard: Object.entries(room.players)
-      .map(([id, p]) => ({ id, name: p.name, score: p.score }))
-      .sort((a, b) => b.score - a.score),
-    config: { pointsPerPart: room.config.pointsPerPart }
-  };
-  io.to(`host:${room.code}`).emit('state:sync', state);
-  io.to(`players:${room.code}`).emit('state:sync', state);
-}
 
-// --- Socket.IO ---
-io.on('connection', (socket) => {
-  // Provide LAN info to every connected client (host will use it)
-  socket.emit('server:lanInfo', { lanIp: LAN_IP, port: (process.env.PORT || 3000) });
-
-  // Host creates a room
-  socket.on('host:createRoom', () => {
-    const code = generateRoomCode();
-    rooms[code] = {
-      code,
+function ensureRoom(roomCode) {
+  let room = rooms.get(roomCode);
+  if (!room) {
+    room = {
+      code: roomCode,
       roundActive: false,
       roundNumber: 0,
       queue: [],
       players: {},
       hostSockets: new Set(),
       lastBuzzAt: {},
-      config: { pointsPerPart: 5 }
+      config: { pointsPerPart: DEFAULT_POINTS_PER_PART }
     };
-    socket.join(`host:${code}`);
-    rooms[code].hostSockets.add(socket.id);
+    rooms.set(roomCode, room);
+  }
+  return room;
+}
 
-    socket.emit('host:roomCreated', { roomCode: code });
-    console.log(`[HOST] createRoom ${code}`);
-    broadcastState(code);
+function sanitizeName(name) {
+  const s = String(name || "").trim();
+  return s.slice(0, 32) || "Player";
+}
+
+function toPublicQueue(room) {
+  return room.queue
+    .filter((id) => room.players[id])
+    .map((id) => ({ id, name: room.players[id].name }));
+}
+
+function toLeaderboard(room) {
+  // sort by score desc, then name asc
+  return Object.entries(room.players)
+    .map(([id, p]) => ({ id, name: p.name, score: p.score || 0 }))
+    .sort((a, b) => (b.score - a.score) || a.name.localeCompare(b.name));
+}
+
+function broadcastState(room) {
+  const payload = {
+    roomCode: room.code,
+    roundActive: room.roundActive,
+    roundNumber: room.roundNumber,
+    queue: toPublicQueue(room),
+    leaderboard: toLeaderboard(room),
+    config: { pointsPerPart: room.config.pointsPerPart }
+  };
+  io.to(room.code).emit("state:sync", payload);
+}
+
+function toast(socketOrRoom, level, message) {
+  const event = level === "error" ? "toast:error"
+    : level === "warning" ? "toast:warning"
+    : "toast:info";
+  if (typeof socketOrRoom === "string") {
+    io.to(socketOrRoom).emit(event, { message });
+  } else if (socketOrRoom && socketOrRoom.emit) {
+    socketOrRoom.emit(event, { message });
+  }
+}
+
+function popFirst(room) {
+  const firstId = room.queue.shift();
+  return firstId || null;
+}
+
+function removeFromQueue(room, socketId) {
+  const idx = room.queue.indexOf(socketId);
+  if (idx >= 0) room.queue.splice(idx, 1);
+}
+
+// ----------------------------------------------------------------------------
+// Round lifecycle
+// ----------------------------------------------------------------------------
+function startRound(room) {
+  room.roundActive = true;
+  room.roundNumber += 1;
+  room.queue = [];
+
+  // apply DQ flags: dqNextRound -> dqThisRound, then clear dqNextRound
+  for (const [id, p] of Object.entries(room.players)) {
+    p.dqThisRound = !!p.dqNextRound;
+    p.dqNextRound = false;
+  }
+  room.lastBuzzAt = {};
+
+  io.to(room.code).emit("round:start", {
+    roomCode: room.code,
+    roundNumber: room.roundNumber
   });
+  broadcastState(room);
+}
 
-  // Host joins an existing room
-  socket.on('host:joinRoom', ({ roomCode }) => {
-    const room = getRoom(roomCode);
-    if (!room) {
-      socket.emit('toast:error', { message: 'Room not found.' });
-      return;
-    }
-    socket.join(`host:${room.code}`);
+function endRound(room) {
+  room.roundActive = false;
+  room.queue = [];
+  for (const [_, p] of Object.entries(room.players)) {
+    p.dqThisRound = false;
+  }
+  io.to(room.code).emit("round:end", {
+    roomCode: room.code,
+    roundNumber: room.roundNumber
+  });
+  broadcastState(room);
+}
+
+// ----------------------------------------------------------------------------
+// Socket.IO wiring
+// ----------------------------------------------------------------------------
+io.on("connection", (socket) => {
+  // Track which room this socket joined (for cleanup)
+  let joinedRoom = null;
+  let isHost = false;
+
+  // ----------------------------- HOST EVENTS ------------------------------
+  socket.on("host:createRoom", () => {
+    // create a unique room code
+    let code;
+    do { code = generateRoomCode(); } while (rooms.has(code));
+    const room = ensureRoom(code);
+
+    // mark this socket as a host of that room
     room.hostSockets.add(socket.id);
-    console.log(`[HOST] joinRoom ${room.code} ${socket.id}`);
-    broadcastState(room.code);
+    joinedRoom = code;
+    isHost = true;
+    socket.join(code);
+
+    socket.emit("host:roomCreated", { roomCode: code });
+    toast(socket, "info", `Room ${code} created.`);
+    broadcastState(room);
   });
 
-  // Player joins room
-  socket.on('player:joinRoom', ({ roomCode, playerName }) => {
-    const room = getRoom(roomCode);
-    if (!room) {
-      socket.emit('toast:error', { message: 'Room not found.' });
+  socket.on("host:joinRoom", ({ roomCode }) => {
+    const code = String(roomCode || "").trim().toUpperCase();
+    if (!rooms.has(code)) {
+      toast(socket, "error", `Room ${code} does not exist.`);
       return;
     }
-    const name = String(playerName || '').trim();
-    if (!name) {
-      socket.emit('toast:error', { message: 'Please enter a name.' });
-      return;
-    }
-    socket.join(`players:${room.code}`);
-    room.players[socket.id] = room.players[socket.id] || {
-      name,
-      score: 0,
-      dqNextRound: false,
-      dqThisRound: false
-    };
-    room.players[socket.id].name = name;
-
-    console.log(`[PLAYER] joinRoom ${room.code} ${name} ${socket.id}`);
-    socket.emit('player:joined', { roomCode: room.code, name });
-    broadcastState(room.code);
+    const room = ensureRoom(code);
+    room.hostSockets.add(socket.id);
+    if (joinedRoom && joinedRoom !== code) socket.leave(joinedRoom);
+    joinedRoom = code;
+    isHost = true;
+    socket.join(code);
+    toast(socket, "info", `Joined Host for room ${code}.`);
+    broadcastState(room);
   });
 
-  // Round controls
-  socket.on('host:startRound', ({ roomCode }) => {
-    const room = getRoom(roomCode);
+  socket.on("host:startRound", ({ roomCode }) => {
+    const room = rooms.get(String(roomCode || "").toUpperCase());
     if (!room) return;
-    room.roundActive = true;
-    room.roundNumber += 1;
-    room.queue = [];
-
-    // Apply DQ flags for THIS round: move dqNextRound -> dqThisRound
-    for (const pid of Object.keys(room.players)) {
-      const p = room.players[pid];
-      if (p.dqNextRound) {
-        p.dqThisRound = true;
-        p.dqNextRound = false;
-      } else {
-        p.dqThisRound = false;
-      }
-    }
-
-    // Reset cooldown map at round start
-    room.lastBuzzAt = {};
-
-    console.log(`[HOST] startRound ${room.code}`);
-    broadcastState(room.code);
-    io.to(`players:${room.code}`).emit('round:start', { roomCode: room.code, roundNumber: room.roundNumber });
+    startRound(room);
   });
 
-  socket.on('host:endRound', ({ roomCode }) => {
-    const room = getRoom(roomCode);
+  socket.on("host:endRound", ({ roomCode }) => {
+    const room = rooms.get(String(roomCode || "").toUpperCase());
     if (!room) return;
-    room.roundActive = false;
-    room.queue = [];
-
-    // Clear dqThisRound flags
-    for (const pid of Object.keys(room.players)) {
-      const p = room.players[pid];
-      if (p.dqThisRound) p.dqThisRound = false;
-    }
-
-    console.log(`[HOST] endRound ${room.code}`);
-    broadcastState(room.code);
-    io.to(`players:${room.code}`).emit('round:end', { roomCode: room.code, roundNumber: room.roundNumber });
+    endRound(room);
   });
 
-  // Player buzz with 300 ms cooldown
-  socket.on('player:buzz', ({ roomCode }) => {
-    const room = getRoom(roomCode);
+  socket.on("host:actionPartCorrect", ({ roomCode }) => {
+    const room = rooms.get(String(roomCode || "").toUpperCase());
     if (!room) return;
-    if (!room.roundActive) return;
+    if (!room.queue.length) return;
 
-    const player = room.players[socket.id];
-    if (!player) return;
-
-    // If DQ for this round, ignore
-    if (player.dqThisRound) return;
-
-    // Cooldown enforcement
-    const now = Date.now();
-    const last = room.lastBuzzAt[socket.id] || 0;
-    if (now - last < 300) {
-      socket.emit('player:cooldown', { msRemaining: Math.max(0, 300 - (now - last)) });
-      return;
-    }
-    room.lastBuzzAt[socket.id] = now;
-
-    // Prevent duplicates in queue
-    if (!room.queue.includes(socket.id)) {
-      room.queue.push(socket.id);
-      console.log(`[PLAYER] buzz ${room.code} ${socket.id}`);
-      broadcastState(room.code);
-    }
-  });
-
-  // --- Scoring / Queue actions ---
-  // +5, keep in queue (award one part)
-  socket.on('host:actionPartCorrect', ({ roomCode }) => {
-    const room = getRoom(roomCode);
-    if (!room) return;
-    ensureRoomConfig(room);
     const firstId = room.queue[0];
-    if (!firstId) return;
-
-    const player = room.players[firstId];
-    if (!player) {
-      room.queue.shift();
-      broadcastState(room.code);
-      return;
+    const p = room.players[firstId];
+    if (p) {
+      p.score = (p.score || 0) + (room.config.pointsPerPart || DEFAULT_POINTS_PER_PART);
     }
-    const add = Number(room.config.pointsPerPart) || 0;
-    player.score += add;
-    io.to(`players:${room.code}`).emit('toast:info', { message: `${player.name} +${add} (part)` });
-    broadcastState(room.code);
+    // player remains at front
+    broadcastState(room);
   });
 
-  // +10 (two parts), remove from queue
-  socket.on('host:actionFullCorrect', ({ roomCode }) => {
-    const room = getRoom(roomCode);
+  socket.on("host:actionFullCorrect", ({ roomCode }) => {
+    const room = rooms.get(String(roomCode || "").toUpperCase());
     if (!room) return;
-    ensureRoomConfig(room);
-    const firstId = room.queue[0];
-    if (!firstId) return;
+    if (!room.queue.length) return;
 
-    const player = room.players[firstId];
-    if (!player) {
-      room.queue.shift();
-      broadcastState(room.code);
-      return;
+    const firstId = popFirst(room);
+    const p = room.players[firstId];
+    if (p) {
+      const inc = (room.config.pointsPerPart || DEFAULT_POINTS_PER_PART) * 2;
+      p.score = (p.score || 0) + inc;
     }
-    const add = (Number(room.config.pointsPerPart) || 0) * 2;
-    player.score += add;
-    room.queue.shift();
-    io.to(`players:${room.code}`).emit('toast:info', { message: `${player.name} +${add} (full)` });
-    broadcastState(room.code);
+    broadcastState(room);
   });
 
-  // Next: remove from queue, no score
-  socket.on('host:actionNext', ({ roomCode }) => {
-    const room = getRoom(roomCode);
+  socket.on("host:actionNext", ({ roomCode }) => {
+    const room = rooms.get(String(roomCode || "").toUpperCase());
     if (!room) return;
-    if (room.queue.length > 0) {
-      const firstId = room.queue[0];
-      const player = room.players[firstId];
-      room.queue.shift();
-      io.to(`players:${room.code}`).emit('toast:warning', { message: `${player ? player.name : 'Player'}: no score` });
-      broadcastState(room.code);
-    }
+    if (!room.queue.length) return;
+    popFirst(room); // no score change
+    broadcastState(room);
   });
 
-  // DQ next round and pop queue
-  socket.on('host:actionDQNextRound', ({ roomCode }) => {
-    const room = getRoom(roomCode);
+  socket.on("host:actionDQNextRound", ({ roomCode }) => {
+    const room = rooms.get(String(roomCode || "").toUpperCase());
     if (!room) return;
-    const firstId = room.queue[0];
-    if (!firstId) return;
+    if (!room.queue.length) return;
 
-    const player = room.players[firstId];
-    if (!player) {
-      room.queue.shift();
-      broadcastState(room.code);
-      return;
-    }
-    player.dqNextRound = true;
-    room.queue.shift();
-    io.to(`players:${room.code}`).emit('toast:warning', { message: `${player.name} DQ next round` });
-    broadcastState(room.code);
+    const firstId = popFirst(room);
+    const p = room.players[firstId];
+    if (p) p.dqNextRound = true;
+    broadcastState(room);
   });
 
-  // Config update: points per part
-  socket.on('config:update', ({ roomCode, pointsPerPart }) => {
-    const room = getRoom(roomCode);
-    if (!room) {
-      socket.emit('toast:error', { message: 'Room not found for config update.' });
-      return;
-    }
-    const p = validatePointsPerPart(pointsPerPart);
-    if (p === null) {
-      socket.emit('toast:error', { message: 'Points per part must be an integer between 0 and 100.' });
-      return;
-    }
-    room.config.pointsPerPart = p;
-    console.log(`[HOST] config:update ${room.code} pointsPerPart=${p}`);
-    io.to(`host:${room.code}`).emit('config:sync', { roomCode: room.code, config: { pointsPerPart: p } });
-    io.to(`players:${room.code}`).emit('config:sync', { roomCode: room.code, config: { pointsPerPart: p } });
-    broadcastState(room.code);
-  });
+  socket.on("config:update", ({ roomCode, pointsPerPart }) => {
+    const room = rooms.get(String(roomCode || "").toUpperCase());
+    if (!room) return;
 
-  // Disconnect cleanup
-  socket.on('disconnect', () => {
-    for (const code of Object.keys(rooms)) {
-      const room = rooms[code];
-      if (room.hostSockets.has(socket.id)) room.hostSockets.delete(socket.id);
-      if (room.players[socket.id]) delete room.players[socket.id];
-      const idx = room.queue.indexOf(socket.id);
-      if (idx >= 0) room.queue.splice(idx, 1);
-
-      if (room.hostSockets.size === 0 && Object.keys(room.players).length === 0) {
-        delete rooms[code];
-        console.log(`[SERVER] Deleted empty room ${code}`);
-      } else {
-        broadcastState(code);
-      }
-    }
-  });
-});
-
-// Start server
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Buzzer App server running on http://localhost:${PORT}`);
-  console.log(`LAN IP detected: ${LAN_IP}:${PORT}`);
-});
+    const val = Number(pointsPerPart);
+    if (Number.isFinite(val) && val >= 0 && val <= MAX_POINTS) {
