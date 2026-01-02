@@ -35,10 +35,9 @@ elBtnJoin.addEventListener('click', () => {
     return;
   }
   socket.emit('player:joinRoom', { roomCode: code, playerName: name });
-  // optimistic UI
   joinedRoomCode = code;
   myName = name;
-  logMsg(elJoinStatus, 'ok', `Joining ${code} as ${name}...`);
+  logMsg(elJoinStatus, 'ok', `Joining ${code} as ${myName}...`);
 });
 
 // Buzz
@@ -54,36 +53,27 @@ elBtnBuzz.addEventListener('click', () => {
   socket.emit('player:buzz', { roomCode: joinedRoomCode });
 });
 
-// Handle server sync state
+// State sync
 socket.on('state:sync', (state) => {
   roundActive = !!state.roundActive;
-
-  // Enable BUZZ only while round is active
   elBtnBuzz.disabled = !roundActive;
 
-  // Queue view
+  // Queue
   try {
     const list = (state.queue || []).map((q, i) => `${i + 1}. ${q.name}`).join('  |  ');
     elQueueView.textContent = list || '(empty)';
-  } catch (_) { /* ignore */ }
+  } catch (_) {}
 
   // Leaderboard
   try {
     elLbTable.innerHTML = '';
     (state.leaderboard || []).forEach((row, idx) => {
       const tr = document.createElement('tr');
-      const tdIdx = document.createElement('td');
-      const tdName = document.createElement('td');
-      const tdScore = document.createElement('td');
-      tdIdx.textContent = `${idx + 1}`;
-      tdName.textContent = row.name;
-      tdScore.textContent = String(row.score ?? 0);
-      tr.append(tdIdx, tdName, tdScore);
+      tr.innerHTML = `<td>${idx + 1}</td><td>${row.name}</td><td>${row.score ?? 0}</td>`;
       elLbTable.appendChild(tr);
     });
-  } catch (_) { /* ignore */ }
+  } catch (_) {}
 
-  // Set page title after join (cosmetic)
   if (myName) document.title = `Buzzer — ${myName}`;
 });
 
@@ -100,7 +90,7 @@ socket.on('round:end', (info) => {
   logMsg(elBuzzHint, 'warn', `Round ${info.roundNumber} ended.`);
 });
 
-// Cooldown feedback
+// Cooldown
 socket.on('player:cooldown', ({ msRemaining }) => {
   logMsg(elBuzzHint, 'warn', `Cooldown… ${Math.ceil(msRemaining)} ms`);
 });
@@ -111,5 +101,5 @@ socket.on('toast:warning',({ message }) => logMsg(elMessages, 'warn', message));
 socket.on('toast:error',  ({ message }) => logMsg(elMessages, 'err',  message));
 
 // Connection status (debug)
-socket.on('connect', () => logMsg(elMessages, 'ok',    `Connected (${socket.id})`));
-socket.on('disconnect', () => logMsg(elMessages, 'err', `Disconnected`));
+socket.on('connect',    () => logMsg(elMessages, 'ok',   `Connected (${socket.id})`));
+socket.on('disconnect', () => logMsg(elMessages, 'err',  'Disconnected'));

@@ -5,19 +5,21 @@
   <meta charset="utf-8" />
   <title>Buzzer — Player</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link href="/styles.css" rel="stylesheet" />
+
+  <!-- Shared theme -->
+  <link rel="stylesheet" href="/styles.css" />
+
   <style>
-    /* Page-specific minimal tweaks (keeps your existing styles.css for theme) */
+    /* Page-specific minimal tweaks (keeps your shared theme) */
     .page { max-width: 900px; margin: 24px auto; padding: 16px; }
     .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
     .card { padding: 16px; border-radius: 10px; background: rgba(255,255,255,0.06); }
     .btn { padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; }
     .btn-primary { background: #4B7CFB; color: #fff; }
     .btn-secondary { background: #1f2a44; color: #dbe5ff; }
-    .btn-danger { background: #d9534f; color: #fff; }
     .btn:disabled { opacity: .5; cursor: not-allowed; }
     input[type="text"] { padding: 8px; border-radius: 8px; min-width: 220px; }
-    .log { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; white-space: pre-wrap; }
+    .log { font-family: ui-monospace, Menlo, Consolas, "Liberation Mono", monospace; white-space: pre-wrap; }
     .ok { color: #4bd36b; }
     .warn { color: #f0ad4e; }
     .err { color: #ff6b6b; }
@@ -65,7 +67,7 @@
     </div>
   </div>
 
-  <!-- Socket.IO client from same origin -->
+  <!-- Socket.IO client from same origin and page script -->
   <script src="/socket.io/socket.io.js"></script>
   <script src="/player.js"></script>
 </body>
