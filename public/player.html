@@ -2,82 +2,70 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Player</title>
-
-  <!-- Correct stylesheet tag -->
-  <link rel="stylesheet" href="/styles.css" />
-
-  <!-- Small inline fallback if styles.css doesn't load -->
+  <meta charset="utf-8" />
+  <title>Buzzer — Player</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="/styles.css" rel="stylesheet" />
   <style>
-    .container { max-width: 820px; margin: 0 auto; padding: 16px; }
-    .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-    .input { padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
-    .btn { padding: 10px 14px; border: none; border-radius: 6px; cursor: pointer; background: #2d6cdf; color: #fff; }
-    .btn.secondary { background: #888; }
-    .mono { font-family: Consolas, 'Courier New', monospace; }
-    .panel { border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-top: 12px; }
-    .muted { color: #777; }
-    .small { font-size: 0.85em; }
-    .hint { color: #666; font-size: 0.9em; }
-    .disabled { opacity: 0.6; cursor: not-allowed; }
+    /* Page-specific minimal tweaks (keeps your existing styles.css for theme) */
+    .page { max-width: 900px; margin: 24px auto; padding: 16px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .card { padding: 16px; border-radius: 10px; background: rgba(255,255,255,0.06); }
+    .btn { padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+    .btn-primary { background: #4B7CFB; color: #fff; }
+    .btn-secondary { background: #1f2a44; color: #dbe5ff; }
+    .btn-danger { background: #d9534f; color: #fff; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    input[type="text"] { padding: 8px; border-radius: 8px; min-width: 220px; }
+    .log { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; white-space: pre-wrap; }
+    .ok { color: #4bd36b; }
+    .warn { color: #f0ad4e; }
+    .err { color: #ff6b6b; }
+    .leaderboard table { width: 100%; border-collapse: collapse; }
+    .leaderboard th, .leaderboard td { padding: 8px; text-align: left; }
+    .queue { font-weight: 600; }
   </style>
 </head>
 <body>
-  <main class="container">
-    <header>
-      <h1 id="title">Player</h1>
-      <p class="muted">Enter the room code and your name, then Join.</p>
-    </header>
+  <div class="page">
+    <h1>Buzzer — Player</h1>
 
-    <!-- Join controls -->
-    <section class="panel" id="join-panel">
+    <div class="card">
       <div class="row">
-        <label class="mono" for="room-code">ROOM CODE</label>
-        <input id="room-code" class="input mono" maxlength="6" placeholder="ABC123" />
+        <input id="roomCode" type="text" placeholder="Room code (e.g., UZJMJJ)" />
+        <input id="playerName" type="text" placeholder="Your name" />
+        <button id="btnJoin" class="btn btn-primary">Join</button>
       </div>
-      <div class="row" style="margin-top:8px;">
-        <label for="player-name">Name</label>
-        <input id="player-name" class="input" maxlength="32" placeholder="Your name" />
+      <div id="joinStatus" class="log"></div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <button id="btnBuzz" class="btn btn-secondary" disabled>BUZZ</button>
       </div>
-      <div class="row" style="margin-top:8px;">
-        <button id="btn-join" class="btn">Join</button>
-        <span id="join-status" class="muted small" aria-live="polite"></span>
-      </div>
-    </section>
+      <div id="buzzHint" class="log"></div>
+    </div>
 
-    <!-- Buzz controls -->
-    <section class="panel">
-      <h2>Buzz</h2>
-      <button id="btn-buzz" class="btn" disabled>BUZZ</button>
-      <span id="buzz-msg" class="muted small" style="margin-left:8px;" aria-live="polite"></span>
-      <p class="hint">BUZZ is enabled only when the round is active. Rapid taps trigger a brief cooldown.</p>
-    </section>
+    <div class="card leaderboard">
+      <h3>Leaderboard</h3>
+      <table id="lbTable">
+        <thead><tr><th>#</th><th>Name</th><th>Score</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
 
-    <!-- Buzz Status (per-player) -->
-    <section id="buzz-status" class="panel">
-      <h2>Status</h2>
-      <div class="buzz-status-row">
-        <span id="buzz-icon" class="buzz-icon idle" aria-label="Buzz status icon"></span>
-        <span id="buzz-text" class="buzz-text">Not buzzed</span>
-      </div>
-      <p class="hint">Green = you are first. Red = you are queued (not first). Grey = you haven’t buzzed.</p>
-    </section>
+    <div class="card">
+      <h3>Buzz Queue</h3>
+      <div id="queueView" class="queue"></div>
+    </div>
 
-    <!-- Public Queue (read-only on player page) -->
-    <section id="public-queue" class="panel">
-      <h2>Buzz Queue</h2>
-      <ol id="player-queue" class="queue-list" aria-live="polite"></ol>
-      <p class="muted small">Queue reflects server order (no duplicates). Updated in real time.</p>
-    </section>
+    <div class="card">
+      <h3>Messages</h3>
+      <div id="messages" class="log"></div>
+    </div>
+  </div>
 
-    <footer class="muted small" style="margin-top:16px;">
-      <p>Tip: If you can open this page but cannot Join, verify the room code and that the host is reachable.</p>
-    </footer>
-  </main>
-
-  <!-- Correct script tags -->
+  <!-- Socket.IO client from same origin -->
   <script src="/socket.io/socket.io.js"></script>
   <script src="/player.js"></script>
 </body>

@@ -1,206 +1,115 @@
 
-/* Player page logic: join room, buzz, status indicator, public queue.
-   Assumes Socket.IO server emits:
-     - state:sync { roomCode, roundActive, roundNumber, queue: [{id,name}], leaderboard, config }
-     - round:start { roomCode, roundNumber }
-     - round:end   { roomCode, roundNumber }
-     - player:cooldown { msRemaining }  (to specific player)
-   And accepts:
-     - player:joinRoom { roomCode, playerName }
-     - player:buzz     { roomCode }
-*/
+// Player page script — same-origin Socket.IO
+const socket = io();
 
-// Socket
-const socket = window.socket || io();
+// Elements
+const elRoomCode   = document.getElementById('roomCode');
+const elPlayerName = document.getElementById('playerName');
+const elBtnJoin    = document.getElementById('btnJoin');
+const elBtnBuzz    = document.getElementById('btnBuzz');
+const elJoinStatus = document.getElementById('joinStatus');
+const elBuzzHint   = document.getElementById('buzzHint');
+const elMessages   = document.getElementById('messages');
+const elLbTable    = document.getElementById('lbTable').querySelector('tbody');
+const elQueueView  = document.getElementById('queueView');
 
-// DOM refs
-const titleEl       = document.getElementById('title');
-const roomCodeEl    = document.getElementById('room-code');
-const playerNameEl  = document.getElementById('player-name');
-const btnJoin       = document.getElementById('btn-join');
-const joinStatusEl  = document.getElementById('join-status');
-
-const btnBuzz       = document.getElementById('btn-buzz');
-const buzzMsgEl     = document.getElementById('buzz-msg');
-
-const buzzIcon      = document.getElementById('buzz-icon');
-const buzzText      = document.getElementById('buzz-text');
-
-const queueList     = document.getElementById('player-queue');
-
-// Local state
-let myId = null;
-let joined = false;
-let joinedRoomCode = '';
-let myName = '';
+// Client-side state
+let joinedRoomCode = null;
+let myName = null;
 let roundActive = false;
 
-// Local cooldown (client-side UX) in ms
-const LOCAL_COOLDOWN_MS = 300;
-let localCooldownUntil = 0;
-
-// Utilities
-function setBuzzEnabled(enabled) {
-  btnBuzz.disabled = !enabled;
-  btnBuzz.classList.toggle('disabled', !enabled);
+// UTIL: logs
+function logMsg(target, className, msg) {
+  const div = document.createElement('div');
+  div.className = className;
+  div.textContent = msg;
+  target.prepend(div);
 }
 
-function showBuzzMessage(msg) {
-  buzzMsgEl.textContent = msg || '';
-}
-
-function vibrate(ms) {
-  try { if (navigator.vibrate) navigator.vibrate(ms); } catch (_) {}
-}
-
-function updateTitleWithName() {
-  if (joined && myName) titleEl.textContent = myName;
-  else titleEl.textContent = 'Player';
-}
-
-function uppercaseCode(s) {
-  return (s || '').trim().toUpperCase();
-}
-
-// --- Socket basics ---
-socket.on('connect', () => {
-  myId = socket.id;
-});
-
-// --- Join flow ---
-btnJoin?.addEventListener('click', () => {
-  const code = uppercaseCode(roomCodeEl?.value);
-  const name = (playerNameEl?.value || '').trim();
-
-  if (!code || code.length !== 6) {
-    joinStatusEl.textContent = 'Room code must be 6 characters.';
-    window.toast?.warning?.('Room code must be 6 characters.');
+// Join room
+elBtnJoin.addEventListener('click', () => {
+  const code = (elRoomCode.value || '').trim().toUpperCase();
+  const name = (elPlayerName.value || '').trim();
+  if (!code || !name) {
+    logMsg(elJoinStatus, 'warn', 'Enter room code and your name.');
     return;
   }
-  if (!name) {
-    joinStatusEl.textContent = 'Please enter a name.';
-    window.toast?.warning?.('Please enter a name.');
-    return;
-  }
-
+  socket.emit('player:joinRoom', { roomCode: code, playerName: name });
+  // optimistic UI
   joinedRoomCode = code;
   myName = name;
-
-  socket.emit('player:joinRoom', { roomCode: joinedRoomCode, playerName: myName });
-  joined = true;
-  updateTitleWithName();
-  joinStatusEl.textContent = `Joined room ${joinedRoomCode}.`;
-  window.toast?.info?.(`Joined room ${joinedRoomCode} as ${myName}`);
+  logMsg(elJoinStatus, 'ok', `Joining ${code} as ${name}...`);
 });
 
-// --- Buzz button ---
-btnBuzz?.addEventListener('click', () => {
-  // Local UX cooldown
-  const now = Date.now();
-  if (now < localCooldownUntil) {
-    const remaining = localCooldownUntil - now;
-    showBuzzMessage(`Cooldown… (${Math.ceil(remaining / 100)}0ms)`);
-    return;
-  }
-  localCooldownUntil = now + LOCAL_COOLDOWN_MS;
-
-  if (!roundActive) {
-    showBuzzMessage('Round inactive');
-    window.toast?.warning?.('Round inactive');
-    return;
-  }
+// Buzz
+elBtnBuzz.addEventListener('click', () => {
   if (!joinedRoomCode) {
-    showBuzzMessage('Join a room first');
-    window.toast?.warning?.('Join a room first');
+    logMsg(elBuzzHint, 'warn', 'Join a room first.');
     return;
   }
-
-  vibrate(20);
+  if (!roundActive) {
+    logMsg(elBuzzHint, 'warn', 'Round is not active.');
+    return;
+  }
   socket.emit('player:buzz', { roomCode: joinedRoomCode });
-  showBuzzMessage('Buzzed!');
 });
 
-// Server-side cooldown notice (per player)
-socket.on('player:cooldown', (payload) => {
-  const ms = payload?.msRemaining ?? 0;
-  if (ms > 0) {
-    showBuzzMessage(`Cooldown… (${ms}ms)`);
-    vibrate(10);
-    window.toast?.info?.('Server cooldown');
-  }
-});
-
-// --- Round lifecycle ---
-socket.on('round:start', () => {
-  roundActive = true;
-  setBuzzEnabled(true);
-  updateBuzzStatus([], roundActive);
-  showBuzzMessage('');
-});
-
-socket.on('round:end', () => {
-  roundActive = false;
-  setBuzzEnabled(false);
-  clearQueue();
-  updateBuzzStatus([], roundActive);
-  showBuzzMessage('Round ended');
-});
-
-// --- State sync (queue + active flag) ---
+// Handle server sync state
 socket.on('state:sync', (state) => {
-  roundActive = !!state?.roundActive;
-  setBuzzEnabled(roundActive);
+  roundActive = !!state.roundActive;
 
-  const queue = Array.isArray(state?.queue) ? state.queue : [];
-  renderQueue(queue);
-  updateBuzzStatus(queue, roundActive);
+  // Enable BUZZ only while round is active
+  elBtnBuzz.disabled = !roundActive;
+
+  // Queue view
+  try {
+    const list = (state.queue || []).map((q, i) => `${i + 1}. ${q.name}`).join('  |  ');
+    elQueueView.textContent = list || '(empty)';
+  } catch (_) { /* ignore */ }
+
+  // Leaderboard
+  try {
+    elLbTable.innerHTML = '';
+    (state.leaderboard || []).forEach((row, idx) => {
+      const tr = document.createElement('tr');
+      const tdIdx = document.createElement('td');
+      const tdName = document.createElement('td');
+      const tdScore = document.createElement('td');
+      tdIdx.textContent = `${idx + 1}`;
+      tdName.textContent = row.name;
+      tdScore.textContent = String(row.score ?? 0);
+      tr.append(tdIdx, tdName, tdScore);
+      elLbTable.appendChild(tr);
+    });
+  } catch (_) { /* ignore */ }
+
+  // Set page title after join (cosmetic)
+  if (myName) document.title = `Buzzer — ${myName}`;
 });
 
-// --- Render queue for players (read-only) ---
-function renderQueue(queue) {
-  if (!queueList) return;
-  queueList.innerHTML = '';
-
-  queue.forEach((entry, idx) => {
-    const li = document.createElement('li');
-    li.className = 'queue-item ' + (idx === 0 ? 'first' : 'waiting');
-    // IMPORTANT: <ol> auto-numbers, so do NOT prefix with `${idx + 1}. `
-    li.textContent = entry.name;
-    queueList.appendChild(li);
-  });
-}
-
-function clearQueue() {
-  if (queueList) queueList.innerHTML = '';
-}
-
-// --- First/queued/idle indicator ---
-function updateBuzzStatus(queue, isActive) {
-  if (!buzzIcon || !buzzText) return;
-
-  const myPos = queue.findIndex((e) => e.id === myId);
-
-  buzzIcon.classList.remove('first', 'queued', 'idle', 'inactive');
-  if (!isActive) {
-    buzzIcon.classList.add('inactive');
-    buzzText.textContent = 'Round inactive';
-    return;
-  }
-
-  if (myPos === 0) {
-    buzzIcon.classList.add('first');
-    buzzText.textContent = 'You are FIRST';
-  } else if (myPos > 0) {
-    buzzIcon.classList.add('queued');
-    buzzText.textContent = `You are queued (position ${myPos + 1})`;
-  } else {
-    buzzIcon.classList.add('idle');
-    buzzText.textContent = 'Not buzzed';
-  }
-}
-
-// Initial UI
-document.addEventListener('DOMContentLoaded', () => {
-  updateTitleWithName();
-  setBuzzEnabled(false); // until round is active
+// Round events
+socket.on('round:start', (info) => {
+  roundActive = true;
+  elBtnBuzz.disabled = false;
+  logMsg(elBuzzHint, 'ok', `Round ${info.roundNumber} started.`);
 });
+
+socket.on('round:end', (info) => {
+  roundActive = false;
+  elBtnBuzz.disabled = true;
+  logMsg(elBuzzHint, 'warn', `Round ${info.roundNumber} ended.`);
+});
+
+// Cooldown feedback
+socket.on('player:cooldown', ({ msRemaining }) => {
+  logMsg(elBuzzHint, 'warn', `Cooldown… ${Math.ceil(msRemaining)} ms`);
+});
+
+// Toasts
+socket.on('toast:info',   ({ message }) => logMsg(elMessages, 'ok',   message));
+socket.on('toast:warning',({ message }) => logMsg(elMessages, 'warn', message));
+socket.on('toast:error',  ({ message }) => logMsg(elMessages, 'err',  message));
+
+// Connection status (debug)
+socket.on('connect', () => logMsg(elMessages, 'ok',    `Connected (${socket.id})`));
+socket.on('disconnect', () => logMsg(elMessages, 'err', `Disconnected`));
