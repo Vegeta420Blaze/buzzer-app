@@ -1,26 +1,23 @@
 
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title id="pageTitleTag">RiBo Buzzer — Player</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title id="pageTitle">RiBo Buzzer — Player</title>
   <link rel="stylesheet" href="styles.css" />
-  <script src="/socket.io/socket.io.js"></script>
 </head>
 <body class="page player">
   <header class="app-header">
-    <h1 id="pageTitle">RiBo Buzzer — Player</h1>
+    <h1>RiBo Buzzer — Player</h1>
   </header>
 
-  <main class="content">
+  <div class="content">
     <section class="card">
       <h2>Join</h2>
-      <div class="controls-grid">
-        <label for="roomCode">Room code:</label>
-        <input id="roomCode" type="text" placeholder="ABC123" />
-        <label for="playerName">Name:</label>
-        <input id="playerName" type="text" placeholder="Your name" />
+      <div class="actions-row">
+        <input type="text" id="roomCode" placeholder="ROOM CODE" maxlength="6" class="link-input" style="max-width:160px;">
+        <input type="text" id="playerName" placeholder="Your name" maxlength="24" class="link-input" style="max-width:220px;">
         <button id="btnJoin" class="btn primary">Join</button>
       </div>
     </section>
@@ -44,13 +41,13 @@
       <h2>Leaderboard</h2>
       <ol id="leaderboardListPlayer" class="leaderboard-list"></ol>
     </section>
-  </main>
+  </div>
 
-  <div id="toast" class="toast hidden"></div>
   <footer class="app-footer">
-    <span class="muted small">RiBo Buzzer — have fun!</span>
+    <div id="toast" class="toast hidden"></div>
   </footer>
 
+  <script src="/socket.io/socket.io.js"></script>
   <script src="player.js"></script>
 </body>
 </html>
