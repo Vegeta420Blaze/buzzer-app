@@ -1,0 +1,5 @@
+[33m4f44066[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m)[m Added New Game feature with full reset functionality
+ public/host.html | 129 [32m++++++++++++++++++++++[m[31m-----------------[m
+ public/host.js   | 112 [32m++[m[31m--------------------------------[m
+ server.js        | 181 [32m++++++++[m[31m-----------------------------------------------[m
+ 3 files changed, 102 insertions(+), 320 deletions(-)

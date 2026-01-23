@@ -1,21 +1,11 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>RiBo Buzzer — Host</title>
-  <link rel="stylesheet" href="styles.css">
-  <style>
-    #toast {
-      position: fixed;
-      right: 16px;
-      bottom: 16px;
-      padding: 10px 14px;
-      border-radius: 10px;
-      background: #243255;
-      border: 1px solid #344469;
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css"/>
 </head>
 <body class="page">
   <header class="app-header">
@@ -26,21 +16,24 @@
     <div>
       <section class="card">
         <h2>Room Controls</h2>
-        <div class="controls-row" style="margin-bottom:16pxtegrated;">
+        <div class="room-info" style="margin-bottom:12px;">
           <button id="btnCreateRoom" class="btn">Create Room</button>
           <span id="roomCode" class="room-code">Room: —</span>
-          <button id="btnStartRound" class="btn primary">Start Round</button>
-          <button id="btnEndRound" class="btn warn">End Round</button>
-          <!-- NEW GAME BUTTON ADDED HERE -->
-          <button id="btnResetGame" class="btn danger">New Game</button>
         </div>
 
-        <div class="controls-grid">
+        <div class="controls-row" style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="btnStartRound" class="btn primary" disabled>Start Round</button>
+          <button id="btnEndRound" class="btn warn" disabled>End Round</button>
+          <!-- New Game button -->
+          <button id="btnNewGame" class="btn warn">New Game</button>
+        </div>
+
+        <div class="controls-grid" style="margin-top:12px;">
           <div>
             <h2>Scoring Config</h2>
-            <div style="display:flex;gap:8px;">
-              <label>Points per part:</label>
-              <input type="number" id="pointsPerPart" min="1" value="5" style="width:60px;padding:4px 8px;" />
+            <div style="display:flex;gap:8px;align-items:center;">
+              <label for="pointsPerPart">Points per part:</label>
+              <input type="number" id="pointsPerPart" min="1" value="5" style="width:72px;padding:4px 8px;"/>
               <button id="btnConfigSave" class="btn">Apply</button>
             </div>
             <p class="muted small">Each answer has two parts. Award 5 for a correct part or 10 for a full answer.</p>
@@ -68,7 +61,7 @@
       </section>
 
       <section class="card" id="qrCard">
-        <hקוםPlayer Join QR</h2>
+        <h2>Player Join QR</h2>
         <div id="qrBlock">
           <div id="qrCanvas" class="qr-canvas"></div>
           <div class="qr-link-row">
