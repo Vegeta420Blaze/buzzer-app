@@ -25,10 +25,19 @@
     <section class="card">
       <h2>Buzz</h2>
       <div style="display:flex; gap:12px; align-items:center; justify-content:center;">
-        <button id="btnBuzz" class="btn buzz-btn" disabled>BUZZ!</button>
+        <button id="btnBuzz" class="btn buzz-btn pressable" disabled>BUZZ!</button>
         <span id="dqBadge" class="badge hidden">DQ this round</span>
       </div>
       <p class="muted" id="buzzHint">Buzz is enabled only during an active round.</p>
+
+      <!-- Micro-feedback toggles -->
+      <div class="settings-row">
+        <label class="toggle"><input type="checkbox" id="toggleSound" /> <span>Sound</span></label>
+        <label class="toggle"><input type="checkbox" id="toggleHaptics" checked /> <span>Vibrate</span></label>
+      </div>
+      <p class="muted small" style="text-align:center;margin-top:6px;">
+        Sounds play only on your device and only after your first tap (browser requirement).
+      </p>
     </section>
 
     <section class="card">
@@ -51,3 +60,4 @@
   <script src="player.js"></script>
 </body>
 </html>
+``

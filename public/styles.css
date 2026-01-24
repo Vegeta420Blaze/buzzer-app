@@ -1,7 +1,7 @@
 
 /* ===========================
    RiBo Buzzer — Global Styles
-   Mobile-first layout polish (V1.4)
+   Mobile-first layout polish + micro-feedback (V1.4.1)
    =========================== */
 
 :root {
@@ -15,7 +15,6 @@
   --danger: #ff5c5c;
 }
 
-/* FIX: ensure consistent sizing on all elements */
 *, *::before, *::after { box-sizing: border-box; }
 
 html, body { height: 100%; }
@@ -31,7 +30,6 @@ body.page {
   overflow-x: hidden;
 }
 
-/* Header / Footer */
 .app-header,
 .app-footer {
   padding: 12px 16px;
@@ -40,13 +38,11 @@ body.page {
 }
 .app-footer { border-top: 1px solid #12172a; border-bottom: none; }
 
-/* Typography & helpers */
 h1, h2, h3 { margin: 8px 0 12px; }
 .muted { color: var(--muted); }
 .small { font-size: 0.85rem; }
 .hidden { display: none !important; }
 
-/* Layout containers */
 .content { padding: 16px; margin: 0 auto; max-width: 980px; }
 .content.two-col {
   display: grid;
@@ -54,7 +50,6 @@ h1, h2, h3 { margin: 8px 0 12px; }
   gap: 16px;
 }
 
-/* Cards */
 .card {
   background: var(--card);
   padding: 12px;
@@ -62,7 +57,6 @@ h1, h2, h3 { margin: 8px 0 12px; }
   border: 1px solid #2a3556;
 }
 
-/* Buttons */
 .btn {
   display: inline-block;
   padding: 8px 12px;
@@ -80,11 +74,14 @@ h1, h2, h3 { margin: 8px 0 12px; }
 .btn.warn    { background: var(--warn); color: #201308; border-color: #c6762e; }
 .btn[disabled] { opacity: 0.6; cursor: not-allowed; }
 
-/* Room header bits */
+/* Subtle press animation on capable devices */
+@media (prefers-reduced-motion: no-preference) {
+  .pressable:active { transform: scale(0.98); }
+}
+
 .room-info { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .room-code { font-weight: 600; padding: 4px 8px; background: #0b1730; border: 1px dashed #27416e; border-radius: 6px; }
 
-/* Grid & utility rows */
 .controls-grid {
   display: grid;
   grid-template-columns: 1fr 1fr auto;
@@ -93,26 +90,25 @@ h1, h2, h3 { margin: 8px 0 12px; }
 }
 .actions-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 
-/* Lists */
 .queue-list, .leaderboard-list { margin: 0; padding-left: 20px; }
 .queue-list li, .leaderboard-list li { margin: 6px 0; }
 
-/* Toast */
 .toast {
   position: fixed;
   right: 16px;
-  bottom: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   padding: 10px 14px;
   border-radius: 10px;
   background: #243255;
   border: 1px solid #344469;
+  z-index: 9999;
 }
 .toast.info    { background: #203054; }
 .toast.warning { background: #4d3c1c; }
 .toast.error   { background: #4c1f1f; }
 .toast.hidden  { display: none; }
 
-/* QR block */
+/* QR block (host) */
 #qrBlock {
   display: grid;
   grid-template-columns: 180px 1fr;
@@ -154,7 +150,6 @@ h1, h2, h3 { margin: 8px 0 12px; }
   display: block;
 }
 
-/* Narrow phones */
 @media (max-width: 380px) {
   .buzz-btn {
     font-size: 1.05rem;
@@ -198,6 +193,23 @@ h1, h2, h3 { margin: 8px 0 12px; }
 }
 .badge.muted { background: #2c3a64; color: #bcd; border-color: #42517a; }
 
+/* Micro-settings row */
+.settings-row {
+  margin-top: 10px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.toggle {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--muted);
+  user-select: none;
+}
+
 /* Responsive enhancements */
 @media (max-width: 900px) {
   .content.two-col { grid-template-columns: 1fr; }
@@ -207,24 +219,15 @@ h1, h2, h3 { margin: 8px 0 12px; }
   .app-header h1 { font-size: 1.15rem; text-align: center; }
   .content { padding: 12px; }
 
-  .room-info,
-  .actions-row,
-  .qr-link-row { flex-wrap: wrap; }
+  .room-info, .actions-row, .qr-link-row { flex-wrap: wrap; }
 
-  /* Stack QR area */
-  #qrBlock {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
+  #qrBlock { grid-template-columns: 1fr; gap: 10px; }
   .qr-canvas { justify-self: center; }
 
-  /* Make link + copy button friendly on mobile */
   .qr-link-row .btn { width: 100%; }
   .link-input { width: 100%; }
 
-  /* Tighter list paddings on mobile */
   .queue-list, .leaderboard-list { padding-left: 18px; }
 }
 
-/* Make media elements scale down */
 img, canvas, svg, video { max-width: 100%; height: auto; }
